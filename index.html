@@ -1,0 +1,997 @@
+<!DOCTYPE html>
+<html lang="es" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PF PAINTBALL - Agenda tu Cita y Reservaciones</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Permanent+Marker&family=Poppins:wght@400;600;800;900&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        neonGreen: '#39FF14',
+                        neonPink: '#FF007F',
+                        neonCyan: '#00E5FF',
+                        neonOrange: '#FF5722',
+                        neonYellow: '#FFE600',
+                        darkBg: '#0b0f19',
+                        darkCard: '#151c2e'
+                    },
+                    fontFamily: {
+                        marker: ['"Permanent Marker"', 'cursive'],
+                        sans: ['Poppins', 'sans-serif']
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background-color: #0b0f19;
+            color: #ffffff;
+            overflow-x: hidden;
+            user-select: none;
+        }
+        /* Custom Paint Splatter Pattern Overlay */
+        .paint-splatter-bg {
+            background-image: radial-gradient(circle at 20% 20%, rgba(255, 0, 127, 0.15) 0%, transparent 25%),
+                              radial-gradient(circle at 80% 30%, rgba(57, 255, 20, 0.15) 0%, transparent 25%),
+                              radial-gradient(circle at 50% 80%, rgba(0, 229, 255, 0.15) 0%, transparent 30%);
+        }
+
+        /* Canvas Overlay for Shots */
+        #splatterCanvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            pointer-events: none;
+            z-index: 9999;
+        }
+
+        /* Paint Splat CSS keyframe for persistent hits */
+        .splat-mark {
+            position: absolute;
+            pointer-events: none;
+            z-index: 9998;
+            transform: translate(-50%, -50%) scale(0);
+            animation: splatPop 0.25s forwards ease-out;
+            border-radius: 40% 60% 70% 30% / 40% 50% 60% 50%;
+            filter: drop-shadow(0px 4px 10px rgba(0,0,0,0.5));
+        }
+
+        @keyframes splatPop {
+            0% { transform: translate(-50%, -50%) scale(0.1) rotate(0deg); opacity: 0; }
+            60% { transform: translate(-50%, -50%) scale(1.2) rotate(15deg); opacity: 1; }
+            100% { transform: translate(-50%, -50%) scale(1) rotate(0deg); opacity: 0.85; }
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 10px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0b0f19;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #39FF14;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body class="font-sans antialiased paint-splatter-bg relative min-h-screen">
+
+    <!-- Canvas for Particle Animations -->
+    <canvas id="splatterCanvas"></canvas>
+
+    <!-- HEADER / NAVIGATION -->
+    <header class="sticky top-0 z-50 bg-darkBg/90 backdrop-blur-md border-b border-neonGreen/30 shadow-lg shadow-neonGreen/10">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
+            
+            <!-- Logo -->
+            <a href="#" class="flex items-center gap-2 group">
+                <div class="w-12 h-12 bg-neonPink rounded-xl flex items-center justify-center transform group-hover:rotate-12 transition-transform shadow-lg shadow-neonPink/50">
+                    <i class="fa-solid fa-crosshairs text-2xl text-black font-black"></i>
+                </div>
+                <div>
+                    <span class="font-marker text-3xl text-transparent bg-clip-text bg-gradient-to-r from-neonGreen via-neonCyan to-neonPink tracking-wider">
+                        PF PAINTBALL
+                    </span>
+                    <span class="block text-[10px] text-neonCyan font-bold tracking-widest uppercase -mt-1">Campo de Combate</span>
+                </div>
+            </a>
+
+            <!-- Desktop Nav Links -->
+            <nav class="hidden md:flex items-center space-x-8 font-semibold text-sm">
+                <a href="#inicio" class="hover:text-neonGreen transition-colors flex items-center gap-1"><i class="fa-solid fa-house text-xs"></i> Inicio</a>
+                <a href="#paquetes" class="hover:text-neonPink transition-colors flex items-center gap-1"><i class="fa-solid fa-tags text-xs"></i> Precios</a>
+                <a href="#calendario" class="hover:text-neonCyan transition-colors flex items-center gap-1"><i class="fa-solid fa-calendar-days text-xs"></i> Disponibilidad</a>
+                <a href="#agendar" class="hover:text-neonYellow transition-colors flex items-center gap-1"><i class="fa-solid fa-bullseye text-xs"></i> Agendar Cita</a>
+                <a href="#contacto" class="hover:text-neonOrange transition-colors flex items-center gap-1"><i class="fa-solid fa-location-dot text-xs"></i> Contacto</a>
+            </nav>
+
+            <!-- Call to Action Button -->
+            <div class="hidden sm:block">
+                <a href="#agendar" class="relative inline-flex items-center justify-center px-6 py-2.5 font-bold text-black uppercase transition-all duration-300 bg-neonGreen rounded-full shadow-lg shadow-neonGreen/40 hover:shadow-neonGreen/80 hover:scale-105 active:scale-95">
+                    <i class="fa-solid fa-gun mr-2"></i> Reservar Ahora
+                </a>
+            </div>
+
+            <!-- Mobile menu button -->
+            <button id="mobileMenuBtn" class="md:hidden text-white text-2xl focus:outline-none p-2">
+                <i class="fa-solid fa-bars" id="menuIcon"></i>
+            </button>
+        </div>
+
+        <!-- Mobile Navigation Menu -->
+        <div id="mobileMenu" class="hidden md:hidden bg-darkCard border-b border-neonGreen/30 px-4 pt-2 pb-6 space-y-3">
+            <a href="#inicio" class="mobile-link block py-2 px-3 rounded hover:bg-neonGreen/20 text-white font-medium">Inicio</a>
+            <a href="#paquetes" class="mobile-link block py-2 px-3 rounded hover:bg-neonPink/20 text-white font-medium">Precios y Paquetes</a>
+            <a href="#calendario" class="mobile-link block py-2 px-3 rounded hover:bg-neonCyan/20 text-white font-medium">Calendario de Disponibilidad</a>
+            <a href="#agendar" class="mobile-link block py-2 px-3 rounded hover:bg-neonYellow/20 text-white font-medium">Agendar Cita</a>
+            <a href="#contacto" class="mobile-link block py-2 px-3 rounded hover:bg-neonOrange/20 text-white font-medium">Contacto</a>
+        </div>
+    </header>
+
+    <!-- HERO SECTION -->
+    <section id="inicio" class="relative py-20 lg:py-32 overflow-hidden flex items-center justify-center">
+        <!-- Background decorative splatters -->
+        <div class="absolute -top-10 -left-10 w-72 h-72 bg-neonPink/20 rounded-full blur-3xl"></div>
+        <div class="absolute top-1/2 -right-10 w-80 h-80 bg-neonGreen/20 rounded-full blur-3xl"></div>
+
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative z-10">
+            <div class="inline-block mb-4 px-4 py-1.5 rounded-full bg-white/10 border border-neonGreen/50 text-neonGreen font-semibold text-xs sm:text-sm tracking-widest uppercase backdrop-blur-sm animate-pulse">
+                💥 ¡Haz clic o toca cualquier parte de la pantalla para disparar! 💥
+            </div>
+            
+            <h1 class="text-4xl sm:text-6xl lg:text-7xl font-black uppercase tracking-tight text-white mb-6">
+                ¡Vive la Guerra de <br class="hidden sm:block"/>
+                <span class="font-marker text-transparent bg-clip-text bg-gradient-to-r from-neonGreen via-neonYellow to-neonPink drop-shadow-[0_5px_15px_rgba(57,255,20,0.4)]">
+                    Pintura Definitiva!
+                </span>
+            </h1>
+
+            <p class="max-w-3xl mx-auto text-gray-300 text-lg sm:text-xl mb-10 leading-relaxed">
+                Adrenalina al máximo en el campo de paintball más grande y completo. Equipamiento profesional, trincheras tácticas y la mejor diversión para tus amigos, eventos o fiesta corporativa.
+            </p>
+
+            <div class="flex flex-col sm:flex-row items-center justify-center gap-4">
+                <a href="#agendar" class="w-full sm:w-auto px-8 py-4 bg-neonGreen text-black font-extrabold text-lg rounded-xl shadow-xl shadow-neonGreen/30 hover:bg-lime-400 hover:scale-105 transition-all transform flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-calendar-check"></i> Agendar Cita Ahora
+                </a>
+                <a href="#calendario" class="w-full sm:w-auto px-8 py-4 bg-darkCard border-2 border-neonCyan text-neonCyan hover:bg-neonCyan hover:text-black font-extrabold text-lg rounded-xl shadow-lg transition-all transform flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-calendar-days"></i> Ver Disponibilidad
+                </a>
+            </div>
+
+            <!-- Stats Badge -->
+            <div class="mt-16 grid grid-cols-2 md:grid-cols-4 gap-4 max-w-4xl mx-auto">
+                <div class="bg-darkCard/80 p-4 rounded-xl border border-white/10 backdrop-blur-sm">
+                    <span class="block text-3xl font-black text-neonGreen">2+</span>
+                    <span class="text-xs text-gray-400 font-semibold uppercase">Campos Tácticos</span>
+                </div>
+                <div class="bg-darkCard/80 p-4 rounded-xl border border-white/10 backdrop-blur-sm">
+                    <span class="block text-3xl font-black text-neonPink">100%</span>
+                    <span class="text-xs text-gray-400 font-semibold uppercase">Seguridad Certificada</span>
+                </div>
+                <div class="bg-darkCard/80 p-4 rounded-xl border border-white/10 backdrop-blur-sm">
+                    <span class="block text-3xl font-black text-neonCyan">500k+</span>
+                    <span class="text-xs text-gray-400 font-semibold uppercase">Bolas Disparadas</span>
+                </div>
+                <div class="bg-darkCard/80 p-4 rounded-xl border border-white/10 backdrop-blur-sm">
+                    <span class="block text-3xl font-black text-neonYellow">4.9 ★</span>
+                    <span class="text-xs text-gray-400 font-semibold uppercase">Valoración Clientes</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- PAQUETES Y PRECIOS -->
+    <section id="paquetes" class="py-20 bg-black/40 border-y border-white/10 relative">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-16">
+                <h2 class="text-xs font-bold uppercase tracking-widest text-neonPink mb-2">Planes de Combate</h2>
+                <p class="font-marker text-4xl sm:text-5xl text-white">Nuestros Paquetes y Precios</p>
+                <div class="w-24 h-1 bg-neonPink mx-auto mt-4 rounded-full"></div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                
+                <!-- Paquete 1 -->
+                <div class="bg-darkCard border-2 border-white/10 rounded-2xl p-8 hover:border-neonGreen transition-all hover:-translate-y-2 relative flex flex-col justify-between shadow-xl group">
+                    <div class="absolute -top-4 right-6 bg-neonGreen text-black text-xs font-black uppercase px-3 py-1 rounded-full shadow-md">
+                        Novato
+                    </div>
+                    <div>
+                        <h3 class="text-2xl font-bold text-white mb-2">Paquete Básico</h3>
+                        <p class="text-gray-400 text-sm mb-6">Ideal para principiantes y partidas rápidas de entrenamiento.</p>
+                        <div class="mb-6">
+                            <span class="text-4xl font-black text-neonGreen">$10</span>
+                            <span class="text-gray-400 text-sm"> / persona</span>
+                        </div>
+                        <ul class="space-y-3 text-gray-300 text-sm mb-8">
+                            <li class="flex items-center"><i class="fa-solid fa-check text-neonGreen mr-3"></i> 75 Cápsulas de Pintura</li>
+                            <li class="flex items-center"><i class="fa-solid fa-check text-neonGreen mr-3"></i> Marcadora Pro + Tanque Co2</li>
+                            <li class="flex items-center"><i class="fa-solid fa-check text-neonGreen mr-3"></i> Máscara Térmica de Protección</li>
+                            <li class="flex items-center"><i class="fa-solid fa-check text-neonGreen mr-3"></i> 45 minutos de Juego Libre</li>
+                            <li class="flex items-center"><i class="fa-solid fa-check text-neonGreen mr-3"></i> Chaleco Táctico Incluido</li>
+                        </ul>
+                    </div>
+                    <button onclick="selectPackage('Básico', 10)" class="w-full py-3 bg-white/10 text-white font-bold rounded-xl group-hover:bg-neonGreen group-hover:text-black transition-colors">
+                        Seleccionar Básico
+                    </button>
+                </div>
+
+                <!-- Paquete 2 (Popular) -->
+                <div class="bg-darkCard border-2 border-neonPink rounded-2xl p-8 shadow-2xl shadow-neonPink/20 hover:-translate-y-2 transition-all relative flex flex-col justify-between transform scale-105 z-10">
+                    <div class="absolute -top-4 right-6 bg-neonPink text-white text-xs font-black uppercase px-4 py-1 rounded-full shadow-lg animate-bounce">
+                        🔥 Más Popular
+                    </div>
+                    <div>
+                        <h3 class="text-2xl font-bold text-white mb-2">Paquete Comando</h3>
+                        <p class="text-gray-400 text-sm mb-6">Para grupos que buscan una experiencia de combate real y duradera.</p>
+                        <div class="mb-6">
+                            <span class="text-4xl font-black text-neonPink">$25</span>
+                            <span class="text-gray-400 text-sm"> / persona</span>
+                        </div>
+                        <ul class="space-y-3 text-gray-300 text-sm mb-8">
+                            <li class="flex items-center"><i class="fa-solid fa-check text-neonPink mr-3"></i> 125 Cápsulas de Pintura</li>
+                            <li class="flex items-center"><i class="fa-solid fa-check text-neonPink mr-3"></i> Marcadora Pro + Tanque Co2</li>
+                            <li class="flex items-center"><i class="fa-solid fa-check text-neonPink mr-3"></i> Máscara Anti-Empañante</li>
+                            <li class="flex items-center"><i class="fa-solid fa-check text-neonPink mr-3"></i> Chaleco Táctico Camuflado</li>
+                            <li class="flex items-center"><i class="fa-solid fa-check text-neonPink mr-3"></i> 1.5 Horas de Juego</li>
+                        </ul>
+                    </div>
+                    <button onclick="selectPackage('Comando', 25)" class="w-full py-3 bg-neonPink text-white font-bold rounded-xl shadow-lg shadow-neonPink/40 hover:bg-pink-600 transition-colors">
+                        Seleccionar Comando
+                    </button>
+                </div>
+
+                <!-- Paquete 3 -->
+                <div class="bg-darkCard border-2 border-white/10 rounded-2xl p-8 hover:border-neonCyan transition-all hover:-translate-y-2 relative flex flex-col justify-between shadow-xl group">
+                    <div class="absolute -top-4 right-6 bg-neonCyan text-black text-xs font-black uppercase px-3 py-1 rounded-full shadow-md">
+                        Legendario
+                    </div>
+                    <div>
+                        <h3 class="text-2xl font-bold text-white mb-2">Paquete Extremo</h3>
+                        <p class="text-gray-400 text-sm mb-6">Ilimitado en emoción. Munición masiva para una guerra total.</p>
+                        <div class="mb-6">
+                            <span class="text-4xl font-black text-neonCyan">$50</span>
+                            <span class="text-gray-400 text-sm"> / persona</span>
+                        </div>
+                        <ul class="space-y-3 text-gray-300 text-sm mb-8">
+                            <li class="flex items-center"><i class="fa-solid fa-check text-neonCyan mr-3"></i>1 paquete de Cápsulas de Pintura</li>
+                            <li class="flex items-center"><i class="fa-solid fa-check text-neonCyan mr-3"></i>Marcadora Pro + 2 Tanque Co2</li>
+                            <li class="flex items-center"><i class="fa-solid fa-check text-neonCyan mr-3"></i> Traje Completo Protegido</li>
+                            <li class="flex items-center"><i class="fa-solid fa-check text-neonCyan mr-3"></i> Tiempo de Juego ILIMITADO</li>
+                           
+                        </ul>
+                    </div>
+                    <button onclick="selectPackage('Extremo', 50)" class="w-full py-3 bg-white/10 text-white font-bold rounded-xl group-hover:bg-neonCyan group-hover:text-black transition-colors">
+                        Seleccionar Extremo
+                    </button>
+                </div>
+
+            </div>
+        </div>
+    </section>
+
+    <!-- SECCIÓN DISPONIBILIDAD & CALENDARIO INTERACTIVO -->
+    <section id="calendario" class="py-20 relative">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-12">
+                <h2 class="text-xs font-bold uppercase tracking-widest text-neonCyan mb-2">Verifica las Fechas Libre</h2>
+                <p class="font-marker text-4xl sm:text-5xl text-white">Calendario de Disponibilidad</p>
+                <div class="w-24 h-1 bg-neonCyan mx-auto mt-4 rounded-full"></div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+                
+                <!-- Componente de Calendario (8 Cols) -->
+                <div class="lg:col-span-7 bg-darkCard border border-white/10 rounded-2xl p-6 shadow-2xl">
+                    
+                    <!-- Calendar Header -->
+                    <div class="flex items-center justify-between mb-6">
+                        <button id="prevMonthBtn" class="p-2 rounded-lg bg-white/5 hover:bg-neonCyan/20 hover:text-neonCyan transition-colors">
+                            <i class="fa-solid fa-chevron-left"></i>
+                        </button>
+                        <h3 id="currentMonthYear" class="text-xl font-bold text-white tracking-wide">Noviembre 2026</h3>
+                        <button id="nextMonthBtn" class="p-2 rounded-lg bg-white/5 hover:bg-neonCyan/20 hover:text-neonCyan transition-colors">
+                            <i class="fa-solid fa-chevron-right"></i>
+                        </button>
+                    </div>
+
+                    <!-- Leyenda de Colores -->
+                    <div class="flex flex-wrap items-center justify-center gap-4 mb-6 text-xs font-semibold">
+                        <div class="flex items-center gap-1.5">
+                            <span class="w-3 h-3 rounded-full bg-neonGreen inline-block"></span>
+                            <span class="text-gray-300">Disponible</span>
+                        </div>
+                        <div class="flex items-center gap-1.5">
+                            <span class="w-3 h-3 rounded-full bg-neonYellow inline-block"></span>
+                            <span class="text-gray-300">Casi Lleno</span>
+                        </div>
+                        <div class="flex items-center gap-1.5">
+                            <span class="w-3 h-3 rounded-full bg-neonPink inline-block"></span>
+                            <span class="text-gray-300">Agotado</span>
+                        </div>
+                    </div>
+
+                    <!-- Días Semana -->
+                    <div class="grid grid-cols-7 gap-2 text-center text-xs font-bold text-gray-400 uppercase mb-2">
+                        <div>Dom</div><div>Lun</div><div>Mar</div><div>Mié</div><div>Jue</div><div>Vie</div><div>Sáb</div>
+                    </div>
+
+                    <!-- Grilla del Calendario -->
+                    <div id="calendarGrid" class="grid grid-cols-7 gap-2 text-sm font-bold">
+                        <!-- JS renders calendar days dynamically -->
+                    </div>
+                </div>
+
+                <!-- Detalle de Horarios del Día Seleccionado (5 Cols) -->
+                <div class="lg:col-span-5 bg-darkCard border border-white/10 rounded-2xl p-6 shadow-2xl flex flex-col justify-between h-full">
+                    <div>
+                        <div class="flex items-center justify-between mb-4 border-b border-white/10 pb-4">
+                            <div>
+                                <span class="text-xs text-gray-400 font-semibold block">FECHA SELECCIONADA</span>
+                                <h4 id="selectedDateTitle" class="text-xl font-bold text-neonCyan">Selecciona un día en el calendario</h4>
+                            </div>
+                            <div class="w-10 h-10 rounded-full bg-neonCyan/10 text-neonCyan flex items-center justify-center">
+                                <i class="fa-regular fa-clock text-lg"></i>
+                            </div>
+                        </div>
+
+                        <p class="text-gray-300 text-sm mb-4">Horarios disponibles para partidas:</p>
+
+                        <!-- Slot de Horarios -->
+                        <div id="timeSlotsContainer" class="grid grid-cols-2 gap-3 mb-6">
+                            <div class="text-center p-6 text-gray-500 col-span-2 text-sm bg-black/20 rounded-xl border border-dashed border-white/10">
+                                <i class="fa-solid fa-hand-pointer text-2xl mb-2 text-neonCyan/50"></i><br>
+                                Haz clic en un día del calendario para ver los horarios disponibles.
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Action Banner inside Calendar -->
+                    <div class="bg-gradient-to-r from-neonGreen/10 to-transparent p-4 rounded-xl border border-neonGreen/30 flex items-center justify-between">
+                        <div class="text-xs text-gray-300">
+                            ¿Tienes un grupo de más de 20 personas?
+                        </div>
+                        <a href="#agendar" class="px-3 py-1.5 bg-neonGreen text-black text-xs font-bold rounded-lg hover:bg-lime-400">
+                            Reserva Privada
+                        </a>
+                    </div>
+
+                </div>
+
+            </div>
+        </div>
+    </section>
+
+    <!-- FORMULARIO DE RESERVACIÓN Y REGISTRO -->
+    <section id="agendar" class="py-20 bg-black/60 border-t border-white/10 relative">
+        <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-12">
+                <h2 class="text-xs font-bold uppercase tracking-widest text-neonYellow mb-2">Asegura tu Combate</h2>
+                <p class="font-marker text-4xl sm:text-5xl text-white">Agendar Cita y Registro</p>
+                <div class="w-24 h-1 bg-neonYellow mx-auto mt-4 rounded-full"></div>
+            </div>
+
+            <div class="bg-darkCard border-2 border-neonYellow/40 rounded-3xl p-6 sm:p-10 shadow-2xl shadow-neonYellow/10">
+                <form id="bookingForm" class="space-y-6">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                        
+                        <!-- Nombre Completo -->
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-300 mb-2">Nombre Completo *</label>
+                            <div class="relative">
+                                <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">
+                                    <i class="fa-solid fa-user"></i>
+                                </span>
+                                <input type="text" id="custName" required placeholder="Ej. Carlos Mendoza" 
+                                    class="w-full pl-10 pr-4 py-3 bg-black/40 border border-white/20 rounded-xl focus:outline-none focus:border-neonYellow text-white placeholder-gray-500">
+                            </div>
+                        </div>
+
+                        <!-- Teléfono -->
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-300 mb-2">Número de Teléfono (WhatsApp) *</label>
+                            <div class="relative">
+                                <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">
+                                    <i class="fa-solid fa-phone"></i>
+                                </span>
+                                <input type="tel" id="custPhone" required placeholder="Ej. +52 55 1234 5678" 
+                                    class="w-full pl-10 pr-4 py-3 bg-black/40 border border-white/20 rounded-xl focus:outline-none focus:border-neonYellow text-white placeholder-gray-500">
+                            </div>
+                        </div>
+
+                        <!-- Correo Electrónico -->
+                        <div class="sm:col-span-2">
+                            <label class="block text-sm font-semibold text-gray-300 mb-2">Correo Electrónico *</label>
+                            <div class="relative">
+                                <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">
+                                    <i class="fa-solid fa-envelope"></i>
+                                </span>
+                                <input type="email" id="custEmail" required placeholder="tuemail@ejemplo.com" 
+                                    class="w-full pl-10 pr-4 py-3 bg-black/40 border border-white/20 rounded-xl focus:outline-none focus:border-neonYellow text-white placeholder-gray-500">
+                            </div>
+                        </div>
+
+                        <!-- Día Seleccionado -->
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-300 mb-2">Día de la Cita *</label>
+                            <input type="date" id="custDate" required 
+                                class="w-full px-4 py-3 bg-black/40 border border-white/20 rounded-xl focus:outline-none focus:border-neonYellow text-white">
+                        </div>
+
+                        <!-- Hora Seleccionada -->
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-300 mb-2">Hora de la Cita *</label>
+                            <select id="custTime" required class="w-full px-4 py-3 bg-black/40 border border-white/20 rounded-xl focus:outline-none focus:border-neonYellow text-white">
+                                <option value="" class="bg-darkCard">Seleccionar Hora</option>
+                                <option value="09:00 AM" class="bg-darkCard">09:00 AM</option>
+                                <option value="11:30 AM" class="bg-darkCard">11:30 AM</option>
+                                <option value="02:00 PM" class="bg-darkCard">02:00 PM</option>
+                                <option value="04:30 PM" class="bg-darkCard">04:30 PM</option>
+                            </select>
+                        </div>
+
+                        <!-- Cantidad de Jugadores -->
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-300 mb-2">Número de Jugadores *</label>
+                            <div class="relative">
+                                <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">
+                                    <i class="fa-solid fa-users"></i>
+                                </span>
+                                <input type="number" id="custPlayers" min="2" max="50" value="4" required 
+                                    class="w-full pl-10 pr-4 py-3 bg-black/40 border border-white/20 rounded-xl focus:outline-none focus:border-neonYellow text-white">
+                            </div>
+                        </div>
+
+                        <!-- Paquete Seleccionado -->
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-300 mb-2">Paquete de Juego *</label>
+                            <select id="custPackage" required class="w-full px-4 py-3 bg-black/40 border border-white/20 rounded-xl focus:outline-none focus:border-neonYellow text-white">
+                                <option value="Básico" class="bg-darkCard">Paquete Básico ($10/persona)</option>
+                                <option value="Comando" selected class="bg-darkCard">Paquete Comando ($25/persona)</option>
+                                <option value="Extremo" class="bg-darkCard">Paquete Extremo ($50/persona)</option>
+                            </select>
+                        </div>
+
+                    </div>
+
+                    <!-- Resumen rápido -->
+                    <div class="bg-black/30 p-4 rounded-xl border border-white/10 flex flex-wrap items-center justify-between gap-4">
+                        <div class="text-sm">
+                            <span class="text-gray-400">Total estimado: </span>
+                            <span id="estimatedPrice" class="text-2xl font-black text-neonYellow">$160 USD</span>
+                        </div>
+                        <div class="text-xs text-gray-400">
+                            * Se paga el 50% para confirmar en campo.
+                        </div>
+                    </div>
+
+                    <button type="submit" class="w-full py-4 bg-neonYellow text-black font-extrabold text-lg uppercase tracking-wider rounded-xl shadow-xl shadow-neonYellow/30 hover:bg-yellow-400 transition-all transform hover:scale-[1.01] active:scale-95 flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-paper-plane"></i> Confirmar y Reservar Cita
+                    </button>
+                </form>
+            </div>
+
+            <!-- Lista de Reservas Confirmadas (Guardadas en cliente) -->
+            <div id="userBookingsSection" class="mt-12 hidden">
+                <h3 class="text-xl font-bold text-white mb-4 flex items-center gap-2">
+                    <i class="fa-solid fa-receipt text-neonGreen"></i> Tus Citas Reservadas
+                </h3>
+                <div id="userBookingsList" class="space-y-4">
+                    <!-- Dynamic Items -->
+                </div>
+            </div>
+
+        </div>
+    </section>
+
+    <!-- CONTACTO Y UBICACIÓN -->
+    <section id="contacto" class="py-20 relative">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-12">
+                <h2 class="text-xs font-bold uppercase tracking-widest text-neonOrange mb-2">Encuéntranos</h2>
+                <p class="font-marker text-4xl sm:text-5xl text-white">Ubicación y Contacto</p>
+                <div class="w-24 h-1 bg-neonOrange mx-auto mt-4 rounded-full"></div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+                
+                <div class="bg-darkCard border border-white/10 p-8 rounded-2xl space-y-6">
+                    <div class="flex items-start gap-4">
+                        <div class="w-12 h-12 bg-neonOrange/20 rounded-xl flex items-center justify-center text-neonOrange text-2xl shrink-0">
+                            <i class="fa-solid fa-map-location-dot"></i>
+                        </div>
+                        <div>
+                            <h4 class="font-bold text-white text-lg">Dirección del Campo</h4>
+                            <p class="text-gray-400 text-sm">El cercadillo, La sabana, Yamasá 92000</p>
+                        </div>
+                    </div>
+
+                    <div class="flex items-start gap-4">
+                        <div class="w-12 h-12 bg-neonGreen/20 rounded-xl flex items-center justify-center text-neonGreen text-2xl shrink-0">
+                            <i class="fa-solid fa-phone-volume"></i>
+                        </div>
+                        <div>
+                            <h4 class="font-bold text-white text-lg">Teléfono y WhatsApp</h4>
+                            <p class="text-gray-400 text-sm">+1 (800) 555-PAINT / +52 55 9876 5432</p>
+                        </div>
+                    </div>
+
+                    <div class="flex items-start gap-4">
+                        <div class="w-12 h-12 bg-neonCyan/20 rounded-xl flex items-center justify-center text-neonCyan text-2xl shrink-0">
+                            <i class="fa-solid fa-clock"></i>
+                        </div>
+                        <div>
+                            <h4 class="font-bold text-white text-lg">Horario de Atención</h4>
+                            <p class="text-gray-400 text-sm">Lunes a Domingo: 10:00 AM – 7:00 PM</p>
+                        </div>
+                    </div>
+
+                    <div class="pt-4 border-t border-white/10 flex items-center gap-4">
+                        <span class="text-sm font-semibold text-gray-400">Síguenos:</span>
+                        <a href="#" data-link="instagram" class="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-white hover:bg-neonPink hover:text-black transition-colors"><i class="fa-brands fa-instagram"></i></a>
+                        <a href="#" data-link="facebook" class="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-white hover:bg-neonCyan hover:text-black transition-colors"><i class="fa-brands fa-facebook-f"></i></a>
+                        <a href="#" data-link="tiktok" class="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-white hover:bg-neonGreen hover:text-black transition-colors"><i class="fa-brands fa-tiktok"></i></a>
+                        <a href="#" data-link="googleMaps" class="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-white hover:bg-neonOrange hover:text-black transition-colors"><i class="fa-solid fa-location-dot"></i></a>
+                    </div>
+                </div>
+
+                <!-- Fake Map Container -->
+                <div class="bg-darkCard border border-white/10 rounded-2xl h-80 relative overflow-hidden flex items-center justify-center group">
+                    <div class="absolute inset-0 bg-cover bg-center opacity-40 group-hover:opacity-60 transition-opacity" style="background-image: url('https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=800&q=80');"></div>
+                    <div class="relative z-10 text-center p-6 bg-black/70 backdrop-blur-md rounded-2xl border border-white/10 max-w-xs">
+                        <i class="fa-solid fa-crosshairs text-4xl text-neonOrange mb-3 animate-spin" style="animation-duration: 8s;"></i>
+                        <h4 class="font-bold text-white mb-1">PF Paintball Field</h4>
+                        <p class="text-xs text-gray-400 mb-4">Ubicación GPS Exacta</p>
+                        <button data-link="googleMaps" onclick="triggerShotEffect(event)" class="px-4 py-2 bg-neonOrange text-black font-bold text-xs rounded-lg uppercase">
+                            Abrir en Google Maps
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </section>
+
+    <!-- FOOTER -->
+    <footer class="bg-black py-10 border-t border-white/10 text-center text-gray-500 text-sm">
+        <div class="max-w-7xl mx-auto px-4">
+            <p class="font-marker text-2xl text-white mb-2">PF PAINTBALL</p>
+            <p class="mb-4">© 2026 PF Paintball Inc. Todos los derechos reservados.</p>
+            <p class="text-xs text-gray-600">Dispara tus preocupaciones. ¡Partidas puras con máxima adrenalina!</p>
+        </div>
+    </footer>
+
+    <!-- MODAL DE CONFIRMACIÓN DE RESERVA -->
+    <div id="bookingModal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden flex items-center justify-center p-4">
+        <div class="bg-darkCard border-2 border-neonGreen rounded-3xl max-w-md w-full p-6 text-center shadow-2xl relative animate-bounce-short">
+            <div class="w-16 h-16 bg-neonGreen/20 text-neonGreen rounded-full flex items-center justify-center text-3xl mx-auto mb-4">
+                <i class="fa-solid fa-check"></i>
+            </div>
+            <h3 class="font-marker text-3xl text-white mb-2">¡Cita Agendada!</h3>
+            <p class="text-gray-300 text-sm mb-6">Tu reservación ha sido registrada con éxito en **PF PAINTBALL**.</p>
+            
+            <div id="modalSummary" class="bg-black/40 rounded-xl p-4 text-left text-xs space-y-2 text-gray-300 mb-6 border border-white/10">
+                <!-- JS Inject Details -->
+            </div>
+
+            <button id="closeModalBtn" class="w-full py-3 bg-neonGreen text-black font-extrabold rounded-xl hover:bg-lime-400 transition-colors uppercase">
+                Aceptar y Continuar
+            </button>
+        </div>
+    </div>
+
+    <!-- JAVASCRIPT LOGIC -->
+    <script>
+        /* ==========================================
+           1. CANVAS & PARTICLE ANIMATION FOR PAINTBALL SHOTS
+           ========================================== */
+        const canvas = document.getElementById('splatterCanvas');
+        const ctx = canvas.getContext('2d');
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        const neonColors = ['#39FF14', '#FF007F', '#00E5FF', '#FF5722', '#FFE600'];
+        let particles = [];
+
+        // Particle Class for Flying Splatters
+        class SplatterParticle {
+            constructor(x, y, color) {
+                this.x = x;
+                this.y = y;
+                this.color = color;
+                this.radius = Math.random() * 8 + 4;
+                const angle = Math.random() * Math.PI * 2;
+                const speed = Math.random() * 12 + 3;
+                this.vx = Math.cos(angle) * speed;
+                this.vy = Math.sin(angle) * speed;
+                this.alpha = 1;
+                this.decay = Math.random() * 0.03 + 0.015;
+                this.gravity = 0.2;
+            }
+
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                this.vy += this.gravity;
+                this.alpha -= this.decay;
+            }
+
+            draw() {
+                ctx.save();
+                ctx.globalAlpha = Math.max(this.alpha, 0);
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+
+        function createShotEffect(x, y) {
+            const randomColor = neonColors[Math.floor(Math.random() * neonColors.length)];
+            
+            // Create Splatter Particles
+            for (let i = 0; i < 25; i++) {
+                particles.push(new SplatterParticle(x, y, randomColor));
+            }
+
+            // Create Splat Mark element on screen
+            const splat = document.createElement('div');
+            splat.className = 'splat-mark';
+            splat.style.left = `${x}px`;
+            splat.style.top = `${y}px`;
+            const size = Math.floor(Math.random() * 40) + 35;
+            splat.style.width = `${size}px`;
+            splat.style.height = `${size}px`;
+            splat.style.backgroundColor = randomColor;
+
+            document.body.appendChild(splat);
+
+            // Fade and remove splat mark after a few seconds
+            setTimeout(() => {
+                splat.style.transition = 'opacity 1s ease';
+                splat.style.opacity = '0';
+                setTimeout(() => splat.remove(), 1000);
+            }, 3000);
+
+            // Play Synthesized Shot Sound (Web Audio API)
+            playPaintballSound();
+        }
+
+        // Animation Loop
+        function animateParticles() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            particles.forEach((p, index) => {
+                p.update();
+                p.draw();
+                if (p.alpha <= 0) {
+                    particles.splice(index, 1);
+                }
+            });
+            requestAnimationFrame(animateParticles);
+        }
+        animateParticles();
+
+        // Audio Synthesis for Gunshot Sound
+        function playPaintballSound() {
+            try {
+                const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                if (!AudioCtx) return;
+                const audioCtx = new AudioCtx();
+                
+                // Noise buffer for blast
+                const bufferSize = audioCtx.sampleRate * 0.1;
+                const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+                const output = buffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) {
+                    output[i] = Math.random() * 2 - 1;
+                }
+
+                const whiteNoise = audioCtx.createBufferSource();
+                whiteNoise.buffer = buffer;
+
+                const filter = audioCtx.createBiquadFilter();
+                filter.type = 'lowpass';
+                filter.frequency.setValueAtTime(800, audioCtx.currentTime);
+                filter.frequency.exponentialRampToValueAtTime(50, audioCtx.currentTime + 0.08);
+
+                const gainNode = audioCtx.createGain();
+                gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.09);
+
+                whiteNoise.connect(filter);
+                filter.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+
+                whiteNoise.start();
+                whiteNoise.stop(audioCtx.currentTime + 0.1);
+            } catch (e) {
+                // Ignore audio restriction errors
+            }
+        }
+
+        // Global Click & Touch Listener
+        document.addEventListener('click', (e) => {
+            // Prevent triggering shots on direct form inputs to allow clean typing
+            if (['INPUT', 'SELECT', 'TEXTAREA', 'BUTTON', 'A'].includes(e.target.tagName)) {
+                return;
+            }
+            createShotEffect(e.clientX, e.clientY);
+        });
+
+        function triggerShotEffect(e) {
+            createShotEffect(e.clientX || window.innerWidth/2, e.clientY || window.innerHeight/2);
+        }
+
+        /* ==========================================
+           ENLACES DE REDES Y UBICACIÓN
+           Pega aquí tus links entre las comillas
+           ========================================== */
+        const enlaces = {
+            tiktok: "https://www.tiktok.com/@pf.paintball",
+            instagram: "https://www.instagram.com/pfpaintball/",
+            facebook: "https://www.facebook.com/profile.php?id=61596116202148",
+            googleMaps: "https://www.google.com/maps/place/18%C2%B047'07.6%22N+70%C2%B000'33.7%22W/@18.7853163,-70.0098357,167m/data=!3m1!1e3!4m5!3m4!4b1!8m2!3d18.7854444!4d-70.0093611?entry=ttu&g_ep=EgoyMDI2MTEwMy4wIKXMDSoASAFQAw%3D%3D"
+        };
+
+        document.querySelectorAll('[data-link]').forEach(el => {
+            const url = enlaces[el.dataset.link];
+            if (!url) return;
+            if (el.tagName === 'A') {
+                el.href = url;
+                el.target = '_blank';
+                el.rel = 'noopener noreferrer';
+            } else {
+                el.addEventListener('click', () => window.open(url, '_blank', 'noopener'));
+            }
+        });
+
+        /* ==========================================
+           2. MOBILE MENU TOGGLE
+           ========================================== */
+        const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+        const mobileMenu = document.getElementById('mobileMenu');
+        mobileMenuBtn.addEventListener('click', () => {
+            mobileMenu.classList.toggle('hidden');
+        });
+        document.querySelectorAll('.mobile-link').forEach(link => {
+            link.addEventListener('click', () => mobileMenu.classList.add('hidden'));
+        });
+
+        /* ==========================================
+           3. INTERACTIVE CALENDAR LOGIC
+           ========================================== */
+        let currentYear = 2026;
+        let currentMonth = 10; // 0-indexed: 10 = Noviembre
+        let selectedDay = 15;
+
+        const monthNames = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+
+        // Simulated Status for days (1 = High availability, 2 = Medium, 3 = Fully Booked)
+        const dayStatuses = {
+            3: 1, 4: 1, 5: 2, 8: 1, 10: 3, 12: 1, 14: 2, 15: 1, 18: 1, 20: 3, 22: 2, 25: 1, 28: 2
+        };
+
+        function renderCalendar() {
+            const currentMonthYearElem = document.getElementById('currentMonthYear');
+            const calendarGrid = document.getElementById('calendarGrid');
+
+            currentMonthYearElem.textContent = `${monthNames[currentMonth]} ${currentYear}`;
+            calendarGrid.innerHTML = '';
+
+            const firstDayIndex = new Date(currentYear, currentMonth, 1).getDay();
+            const totalDays = new Date(currentYear, currentMonth + 1, 0).getDate();
+
+            // Empty cells before first day
+            for (let i = 0; i < firstDayIndex; i++) {
+                const emptyCell = document.createElement('div');
+                emptyCell.className = 'h-11 border border-transparent';
+                calendarGrid.appendChild(emptyCell);
+            }
+
+            // Days of the month
+            for (let day = 1; day <= totalDays; day++) {
+                const dayBtn = document.createElement('button');
+                dayBtn.type = 'button';
+                
+                const status = dayStatuses[day] || (day % 3 === 0 ? 2 : 1);
+                
+                let colorClasses = "bg-neonGreen/10 border-neonGreen/30 text-white hover:bg-neonGreen hover:text-black";
+                if (status === 2) {
+                    colorClasses = "bg-neonYellow/10 border-neonYellow/30 text-white hover:bg-neonYellow hover:text-black";
+                } else if (status === 3) {
+                    colorClasses = "bg-neonPink/20 border-neonPink/40 text-gray-400 opacity-60 cursor-not-allowed";
+                }
+
+                if (day === selectedDay) {
+                    colorClasses += " ring-2 ring-white scale-105 font-black";
+                }
+
+                dayBtn.className = `h-11 rounded-xl border flex flex-col items-center justify-center transition-all ${colorClasses}`;
+                dayBtn.innerHTML = `<span>${day}</span>`;
+
+                if (status !== 3) {
+                    dayBtn.onclick = () => {
+                        selectedDay = day;
+                        renderCalendar();
+                        updateSelectedDayView(day);
+                    };
+                }
+
+                calendarGrid.appendChild(dayBtn);
+            }
+        }
+
+        function updateSelectedDayView(day) {
+            const formattedDate = `${day} de ${monthNames[currentMonth]}, ${currentYear}`;
+            document.getElementById('selectedDateTitle').textContent = formattedDate;
+
+            // Sync with date input in booking form
+            const monthStr = String(currentMonth + 1).padStart(2, '0');
+            const dayStr = String(day).padStart(2, '0');
+            document.getElementById('custDate').value = `${currentYear}-${monthStr}-${dayStr}`;
+
+            // Render available time slots
+            const slotsContainer = document.getElementById('timeSlotsContainer');
+            const slots = [
+                { time: "09:00 AM", status: "Disponible", color: "neonGreen" },
+                { time: "11:30 AM", status: "Disponible", color: "neonGreen" },
+                { time: "02:00 PM", status: "Pocos cupos", color: "neonYellow" },
+                { time: "04:30 PM", status: "Disponible", color: "neonGreen" }
+            ];
+
+            slotsContainer.innerHTML = slots.map(s => `
+                <button type="button" onclick="selectTimeSlot('${s.time}')" 
+                    class="p-3 bg-black/40 border border-white/10 rounded-xl hover:border-${s.color} text-center transition-all hover:scale-105 group">
+                    <span class="block font-bold text-white group-hover:text-${s.color}">${s.time}</span>
+                    <span class="text-[10px] text-gray-400">${s.status}</span>
+                </button>
+            `).join('');
+        }
+
+        function selectTimeSlot(time) {
+            document.getElementById('custTime').value = time;
+            document.getElementById('agendar').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        document.getElementById('prevMonthBtn').onclick = () => {
+            currentMonth--;
+            if (currentMonth < 0) { currentMonth = 11; currentYear--; }
+            renderCalendar();
+        };
+
+        document.getElementById('nextMonthBtn').onclick = () => {
+            currentMonth++;
+            if (currentMonth > 11) { currentMonth = 0; currentYear++; }
+            renderCalendar();
+        };
+
+        /* ==========================================
+           4. FORM & BOOKING MANAGEMENT
+           ========================================== */
+        const packagePrices = { "Básico": 25, "Comando": 40, "Extremo": 60 };
+        const bookingForm = document.getElementById('bookingForm');
+        const playersInput = document.getElementById('custPlayers');
+        const packageSelect = document.getElementById('custPackage');
+        const priceDisplay = document.getElementById('estimatedPrice');
+        const savedBookings = [];
+
+        function calculatePrice() {
+            const players = parseInt(playersInput.value) || 0;
+            const pkg = packageSelect.value;
+            const unitPrice = packagePrices[pkg] || 40;
+            const total = players * unitPrice;
+            priceDisplay.textContent = `$${total} USD`;
+            return total;
+        }
+
+        playersInput.addEventListener('input', calculatePrice);
+        packageSelect.addEventListener('change', calculatePrice);
+
+        function selectPackage(pkgName, price) {
+            packageSelect.value = pkgName;
+            calculatePrice();
+            document.getElementById('agendar').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        bookingForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+
+            const booking = {
+                id: 'PF-' + Math.floor(1000 + Math.random() * 9000),
+                name: document.getElementById('custName').value,
+                phone: document.getElementById('custPhone').value,
+                email: document.getElementById('custEmail').value,
+                date: document.getElementById('custDate').value,
+                time: document.getElementById('custTime').value,
+                players: document.getElementById('custPlayers').value,
+                package: document.getElementById('custPackage').value,
+                total: calculatePrice()
+            };
+
+            savedBookings.push(booking);
+            renderUserBookings();
+
+            // Populate Modal
+            document.getElementById('modalSummary').innerHTML = `
+                <p><strong class="text-white">Código Reserva:</strong> ${booking.id}</p>
+                <p><strong class="text-white">Cliente:</strong> ${booking.name}</p>
+                <p><strong class="text-white">Fecha y Hora:</strong> ${booking.date} a las ${booking.time}</p>
+                <p><strong class="text-white">Jugadores:</strong> ${booking.players} personas</p>
+                <p><strong class="text-white">Paquete:</strong> ${booking.package}</p>
+                <p><strong class="text-white">Total Estimado:</strong> <span class="text-neonGreen font-bold">$${booking.total} USD</span></p>
+            `;
+
+            // Open Modal
+            document.getElementById('bookingModal').classList.remove('hidden');
+
+            // Trigger Victory Splatter Shots
+            for (let i = 0; i < 5; i++) {
+                setTimeout(() => {
+                    createShotEffect(
+                        window.innerWidth / 2 + (Math.random() * 300 - 150),
+                        window.innerHeight / 2 + (Math.random() * 300 - 150)
+                    );
+                }, i * 150);
+            }
+        });
+
+        document.getElementById('closeModalBtn').onclick = () => {
+            document.getElementById('bookingModal').classList.add('hidden');
+            bookingForm.reset();
+            calculatePrice();
+        };
+
+        function renderUserBookings() {
+            const container = document.getElementById('userBookingsList');
+            const section = document.getElementById('userBookingsSection');
+
+            if (savedBookings.length === 0) {
+                section.classList.add('hidden');
+                return;
+            }
+
+            section.classList.remove('hidden');
+            container.innerHTML = savedBookings.map(b => `
+                <div class="bg-darkCard p-4 rounded-xl border border-neonGreen/40 flex flex-wrap items-center justify-between gap-4">
+                    <div>
+                        <span class="text-xs font-bold text-neonGreen">${b.id}</span>
+                        <h5 class="font-bold text-white text-base">${b.name}</h5>
+                        <p class="text-xs text-gray-400"><i class="fa-regular fa-calendar"></i> ${b.date} - ${b.time} | <i class="fa-solid fa-users"></i> ${b.players} Jugadores</p>
+                    </div>
+                    <div class="text-right">
+                        <span class="block text-lg font-black text-white">$${b.total} USD</span>
+                        <span class="inline-block px-2 py-0.5 bg-neonGreen/20 text-neonGreen text-[10px] font-bold rounded-full">Confirmada</span>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Initialize on window load
+        window.onload = () => {
+            renderCalendar();
+            updateSelectedDayView(selectedDay);
+            calculatePrice();
+        };
+    </script>
+</body>
+</html>
